@@ -1,7 +1,7 @@
-from json import JSONDecoder
-
+from django.db import IntegrityError
 from rest_framework import viewsets
 import requests
+
 from .models import Disaster
 from .serializer import DisasterSerializer
 
@@ -20,13 +20,10 @@ def fetch_data_reliefweb():
         print("Error occurred fetching ReliefWeb data.")
         return None
 
-    # Calculate iterations by the total count of disasters modulo
-    # by the return limit (1000), + 1 to get the number of pages
+    # Calculate by dividing by 1000 and removing the fractional component
+    # This is due to ReliefWeb's return limit of 1000 disasters per query
     iterations = (total_count // 1000)
     disasters = []
-
-    print("total ", total_count)
-    print("iterations ", iterations)
 
     for _ in range(iterations):
         response = requests.get(url)
@@ -35,7 +32,10 @@ def fetch_data_reliefweb():
             response.raise_for_status()
             response_json = response.json()
             response_data = response_json["data"]
+            count = 0
             for entry in response_data:
+                count += 1
+                print("making request to reliefweb: ", count)
 
                 # Make request to provided href
                 entry_url = entry["href"]
@@ -48,16 +48,16 @@ def fetch_data_reliefweb():
                     return None
 
                 disaster = {
-                    "id": entry_response_json["data"]["id"],
+                    "id": entry_response_json["data"][0]["id"],
                     "api": "ReliefWeb",
                     "source": None,
-                    "name": entry_response_json["data"]["fields"]["name"],
-                    "category": entry_response_json["data"]["fields"]["primary_type"]["name"],
-                    "reference": entry_response_json["data"]["fields"]["url"],
-                    "country": entry_response_json["data"]["fields"]["primary_country"]["name"],
-                    "date": entry_response_json["data"]["fields"]["date"]["event"],
-                    "description": entry_response_json["data"]["fields"]["description-html"],
-                    "status": entry_response_json["data"]["fields"]["status"],
+                    "name": entry_response_json["data"][0]["fields"]["name"],
+                    "category": entry_response_json["data"][0]["fields"]["primary_type"]["name"],
+                    "reference": entry_response_json["data"][0]["fields"]["url"],
+                    "country": entry_response_json["data"][0]["fields"]["primary_country"]["name"],
+                    "date": entry_response_json["data"][0]["fields"]["date"]["event"],
+                    "description": entry_response_json["data"][0]["fields"].get("description-html", None),
+                    "status": entry_response_json["data"][0]["fields"]["status"],
                     "longitudinal": None,
                     "latitudinal": None
                 }
@@ -153,8 +153,8 @@ class DisasterViewset(viewsets.ReadOnlyModelViewSet):
                 try:
                     disaster_object = Disaster.objects.create(
                         id=disaster["id"],
-                        source=disaster["source"],
-                        api=disaster["api"],
+                        source=disaster["sources"][0]["url"],
+                        api="EONET",
                         name=disaster["title"],
                         reference=disaster["link"],
                         category=process_category_eonet(disaster["categories"][0]["id"]),
@@ -166,6 +166,8 @@ class DisasterViewset(viewsets.ReadOnlyModelViewSet):
                         latitudinal=disaster["geometry"][0]["coordinates"][1]
                     )
                     disaster_object.save()
+                except IntegrityError:
+                    pass
                 except:
                     print("Error saving disaster from EONET...")
                     pass
@@ -181,7 +183,7 @@ class DisasterViewset(viewsets.ReadOnlyModelViewSet):
                         id=disaster["id"],
                         source=disaster["source"],
                         api=disaster["api"],
-                        name=disaster["title"],
+                        name=disaster["name"],
                         reference=disaster["reference"],
                         category=disaster["category"],
                         country=disaster["country"],
@@ -192,6 +194,8 @@ class DisasterViewset(viewsets.ReadOnlyModelViewSet):
                         latitudinal=disaster["latitudinal"]
                     )
                     reliefweb_disaster_object.save()
+                except IntegrityError:
+                    pass
                 except:
                     print("Error saving disaster from ReliefWeb...")
                     pass
