@@ -68,7 +68,7 @@ class Disaster(models.Model):
     reference = models.CharField(max_length=200, null=True, blank=True)
     country = models.CharField(max_length=60, null=True, blank=True)
     date = models.DateTimeField(auto_now=False, auto_now_add=False, null=True, blank=True)
-    description = models.TextField(max_length=1500, null=True, blank=True)
+    description = models.TextField(max_length=20000, null=True, blank=True)
     status = models.CharField(max_length=60, null=True, blank=True)
     longitudinal = models.FloatField(null=True, blank=True)
     latitudinal = models.FloatField(null=True, blank=True)
