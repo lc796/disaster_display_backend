@@ -12,6 +12,6 @@ def start():
 
     # Schedule tasks to run with an interval, and to start the first job after 3 seconds
     scheduler.add_job(disaster.save_disaster_data, "interval", hours=HOURS_BETWEEN_JOBS,
-                      next_run_time=(datetime.datetime.now() + datetime.timedelta(seconds=3)),
+                      next_run_time=(datetime.datetime.now() + datetime.timedelta(hours=2)),
                       id="fetcher 01", replace_existing=True)
     scheduler.start()
