@@ -11,7 +11,6 @@ def fetch_data_reliefweb():
     url = "https://api.reliefweb.int/v1/disasters?limit=1000"
     initial_response = requests.get(url)
 
-    total_count = 0
     try:
         initial_response.raise_for_status()
         initial_response_json = initial_response.json()
@@ -115,16 +114,66 @@ def process_category_eonet(category: str):
     return None
 
 
+def process_category_reliefweb(category: str):
+    print(category)
+    match category:
+        case "cold wave":
+            return Disaster.COLD_WAVE
+        case "complex emergency":
+            return Disaster.COMPLEX_EMERGENCY
+        case "drought":
+            return Disaster.DROUGHT
+        case "earthquake":
+            return Disaster.EARTHQUAKE
+        case "epidemic":
+            return Disaster.EPIDEMIC
+        case "extratropical cyclone":
+            return Disaster.EXTRA_TROPICAL_CYCLONE
+        case "fire":
+            return Disaster.FIRE
+        case "flood":
+            return Disaster.FLOOD
+        case "flash flood":
+            return Disaster.FLOOD
+        case "heat wave":
+            return Disaster.HEAT_WAVE
+        case "insect infestation":
+            return Disaster.INSECT_INFESTATION
+        case "land slide":
+            return Disaster.LANDSLIDE
+        case "mud slide":
+            return Disaster.MUDSLIDE
+        case "other":
+            return Disaster.OTHER
+        case "severe local storm":
+            return Disaster.SEVERE_STORM
+        case "snow avalanche":
+            return Disaster.SNOW
+        case "storm surge":
+            return Disaster.SEVERE_STORM
+        case "technological disaster":
+            return Disaster.MAN_MADE
+        case "tropical cyclone":
+            return Disaster.TROPICAL_CYCLONE
+        case "tsunami":
+            return Disaster.TSUNAMI
+        case "volcano":
+            return Disaster.VOLCANO
+        case "wild fire":
+            return Disaster.WILDFIRE
+    return None
+
+
 class DisasterViewset(viewsets.ReadOnlyModelViewSet):
     serializer_class = DisasterSerializer
 
+    # todo: cache response?
     def get_queryset(self):
         data = Disaster.objects.all()
-
         # Enable filtering by API source
         api = self.request.query_params.get("api")
         if api is not None:
-            data = data.filter(api=api)
+            data = data.filter(api=api)  # todo: ignore case sensitivity
 
         # Enable filtering by category
         category = self.request.query_params.get("category")
@@ -150,6 +199,7 @@ class DisasterViewset(viewsets.ReadOnlyModelViewSet):
         # Handle EONET data
         if eonet_data is not None:
             for disaster in eonet_data:
+                print(process_category_eonet(disaster["categories"][0]["id"]))
                 try:
                     disaster_object = Disaster.objects.create(
                         id=disaster["id"],
@@ -185,7 +235,7 @@ class DisasterViewset(viewsets.ReadOnlyModelViewSet):
                         api=disaster["api"],
                         name=disaster["name"],
                         reference=disaster["reference"],
-                        category=disaster["category"],
+                        category=process_category_reliefweb(disaster["category"].lower()),
                         country=disaster["country"],
                         date=disaster["date"],
                         description=disaster["description"],
@@ -194,7 +244,10 @@ class DisasterViewset(viewsets.ReadOnlyModelViewSet):
                         latitudinal=disaster["latitudinal"]
                     )
                     reliefweb_disaster_object.save()
-                except IntegrityError:
+                    print("DEBUG: saved ReliefWeb data correctly!\n")
+                except IntegrityError as e:
+                    print("Integrity error saving ReliefWeb data...")
+                    print(e)
                     pass
                 except:
                     print("Error saving disaster from ReliefWeb...")
